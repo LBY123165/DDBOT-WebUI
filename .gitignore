@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.build/
+data/
+log/
+*.log
+*.db
+*.db.lock
+config.json
+qrcode.png
+sea-prep.blob
+sea-config.json

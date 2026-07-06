@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DDBOT-WSa 管理面板</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon"><i class="fas fa-robot"></i></div>
+          <div class="logo-text">
+            <span class="logo-title">DDBOT-WSa</span>
+            <span class="logo-sub">管理面板</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-page="dashboard">
+          <i class="fas fa-gauge-high"></i>
+          <span>仪表盘</span>
+        </a>
+        <a href="#" class="nav-item" data-page="adapter">
+          <i class="fas fa-plug"></i>
+          <span>适配器</span>
+        </a>
+        <a href="#" class="nav-item" data-page="logs">
+          <i class="fas fa-terminal"></i>
+          <span>日志</span>
+        </a>
+        <a href="#" class="nav-item" data-page="subscriptions">
+          <i class="fas fa-bell"></i>
+          <span>订阅管理</span>
+        </a>
+        <a href="#" class="nav-item" data-page="settings">
+          <i class="fas fa-gear"></i>
+          <span>设置</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="theme-toggle" onclick="toggleTheme()">
+          <i class="fas fa-sun" id="themeIcon"></i>
+          <div class="theme-toggle-track">
+            <div class="theme-toggle-thumb"></div>
+          </div>
+          <span id="themeLabel">暗色</span>
+        </div>
+        <div class="sidebar-status">
+          <span class="status-dot" id="sidebarStatusDot"></span>
+          <span id="sidebarStatusText">未连接</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Dashboard Page -->
+      <section class="page active" id="page-dashboard">
+        <div class="page-header">
+          <h1><i class="fas fa-gauge-high"></i> 仪表盘</h1>
+          <div class="header-actions">
+            <button class="btn btn-sm" onclick="refreshStatus()" title="刷新">
+              <i class="fas fa-refresh"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Status Cards -->
+        <div class="status-grid">
+          <div class="status-card" id="botStatusCard">
+            <div class="card-header">
+              <div class="card-icon bot-icon"><i class="fas fa-robot"></i></div>
+              <div class="card-title">Bot 进程</div>
+            </div>
+            <div class="card-body">
+              <div class="card-status">
+                <span class="status-badge" id="botStatusBadge">未知</span>
+                <span class="card-pid" id="botPid"></span>
+              </div>
+              <div class="card-info">
+                <div class="info-row">
+                  <span class="info-label">运行时间</span>
+                  <span class="info-value" id="botUptime">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">可执行文件</span>
+                  <span class="info-value mono" id="botExe">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">工作目录</span>
+                  <span class="info-value mono" id="botWorkDir" style="font-size:11px;word-break:break-all">-</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-success btn-sm" id="btnStart" onclick="startBot()">
+                <i class="fas fa-play"></i> 启动
+              </button>
+              <button class="btn btn-danger btn-sm" id="btnStop" onclick="stopBot()" disabled>
+                <i class="fas fa-stop"></i> 停止
+              </button>
+              <button class="btn btn-warning btn-sm" id="btnRestart" onclick="restartBot()" disabled>
+                <i class="fas fa-rotate-right"></i> 重启
+              </button>
+            </div>
+          </div>
+
+          <div class="status-card" id="onebotStatusCard">
+            <div class="card-header">
+              <div class="card-icon onebot-icon"><i class="fas fa-link"></i></div>
+              <div class="card-title">OneBot 连接</div>
+            </div>
+            <div class="card-body">
+              <div class="card-status">
+                <span class="status-badge" id="onebotStatusBadge">未知</span>
+              </div>
+              <div class="card-info">
+                <div class="info-row">
+                  <span class="info-label">协议</span>
+                  <span class="info-value" id="obProtocol">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">模式</span>
+                  <span class="info-value" id="obMode">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">地址</span>
+                  <span class="info-value mono" id="obAddr">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="status-card" id="autoStartCard">
+            <div class="card-header">
+              <div class="card-icon autostart-icon"><i class="fas fa-power-off"></i></div>
+              <div class="card-title">开机自启</div>
+            </div>
+            <div class="card-body">
+              <div class="card-status">
+                <span class="status-badge" id="autoStartBadge">未知</span>
+              </div>
+              <div class="card-info">
+                <div class="info-row">
+                  <span class="info-label">状态</span>
+                  <span class="info-value" id="autoStartStatus">-</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-primary btn-sm" id="btnAutoStart" onclick="toggleAutoStart()">
+                <i class="fas fa-power-off"></i> 切换
+              </button>
+            </div>
+          </div>
+
+          <div class="status-card" id="systemCard">
+            <div class="card-header">
+              <div class="card-icon system-icon"><i class="fas fa-server"></i></div>
+              <div class="card-title">系统信息</div>
+            </div>
+            <div class="card-body">
+              <div class="card-info">
+                <div class="info-row">
+                  <span class="info-label">平台</span>
+                  <span class="info-value" id="sysPlatform">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">CPU</span>
+                  <span class="info-value" id="sysCpu">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">内存</span>
+                  <span class="info-value" id="sysMemory">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Node.js</span>
+                  <span class="info-value" id="sysNode">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Logs -->
+        <div class="section-card">
+          <div class="section-header">
+            <h2><i class="fas fa-clock-rotate-left"></i> 最近日志</h2>
+            <button class="btn btn-sm" onclick="navigateTo('logs')">
+              查看全部 <i class="fas fa-arrow-right"></i>
+            </button>
+          </div>
+          <div class="log-preview" id="dashboardLogs">
+            <div class="log-empty">暂无日志</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Adapter Page -->
+      <section class="page" id="page-adapter">
+        <div class="page-header">
+          <h1><i class="fas fa-plug"></i> 适配器连接</h1>
+          <div class="header-actions">
+            <button class="btn btn-sm" onclick="loadAdapterConfig()" title="刷新">
+              <i class="fas fa-refresh"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Connection Status Banner -->
+        <div class="adapter-status-banner" id="adapterBanner">
+          <div class="adapter-banner-icon"><i class="fas fa-plug"></i></div>
+          <div class="adapter-banner-info">
+            <div class="adapter-banner-title" id="adapterBannerTitle">检测中...</div>
+            <div class="adapter-banner-desc" id="adapterBannerDesc">正在读取适配器配置</div>
+          </div>
+          <div class="adapter-banner-actions">
+            <button class="btn btn-sm" id="btnAdapterTest" onclick="testAdapterConnection()">
+              <i class="fas fa-satellite-dish"></i> 测试连接
+            </button>
+          </div>
+        </div>
+
+        <!-- QQ Protocol + Connection Details -->
+        <div class="adapter-grid">
+          <div class="section-card">
+            <div class="section-header">
+              <h2><i class="fas fa-cogs"></i> QQ 协议配置</h2>
+              <button class="btn btn-primary btn-sm" onclick="saveAdapterConfig()">
+                <i class="fas fa-save"></i> 保存
+              </button>
+            </div>
+            <div class="adapter-form">
+              <div class="form-row">
+                <label><i class="fas fa-plug"></i> 协议适配器</label>
+                <select id="adapterProtocol" onchange="onAdapterChange()">
+                  <option value="onebot-v11">OneBot v11</option>
+                  <option value="satori">Satori</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label><i class="fas fa-wifi"></i> 连接模式</label>
+                <select id="adapterWsMode" onchange="onAdapterChange()">
+                  <option value="ws-server">正向 WebSocket (ws-server)</option>
+                  <option value="ws-reverse">反向 WebSocket (ws-reverse)</option>
+                </select>
+              </div>
+              <div class="form-row" id="wsServerRow">
+                <label><i class="fas fa-server"></i> 监听地址</label>
+                <input type="text" id="adapterWsServer" placeholder="0.0.0.0:15630" onchange="onAdapterChange()">
+              </div>
+              <div class="form-row" id="wsReverseRow" style="display:none">
+                <label><i class="fas fa-arrow-right-arrow-left"></i> 反向地址</label>
+                <input type="text" id="adapterWsReverse" placeholder="ws://localhost:3001" onchange="onAdapterChange()">
+              </div>
+              <div class="form-row">
+                <label><i class="fas fa-key"></i> Access Token</label>
+                <input type="password" id="adapterToken" placeholder="留空表示无令牌" onchange="onAdapterChange()">
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-header">
+              <h2><i class="fas fa-circle-nodes"></i> 连接详情</h2>
+            </div>
+            <div class="detail-list">
+              <div class="detail-row">
+                <span class="detail-label"><i class="fas fa-signal"></i> 连接状态</span>
+                <span class="status-badge" id="adapterConnBadge">未知</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label"><i class="fas fa-diagram-project"></i> 协议</span>
+                <span class="detail-value" id="adapterDetailProto">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label"><i class="fas fa-arrows-left-right"></i> 模式</span>
+                <span class="detail-value" id="adapterDetailMode">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label"><i class="fas fa-earth-americas"></i> 地址</span>
+                <span class="detail-value mono" id="adapterDetailAddr">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label"><i class="fas fa-lock"></i> 令牌</span>
+                <span class="detail-value" id="adapterDetailToken">未设置</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telegram -->
+        <div class="adapter-grid">
+          <div class="section-card">
+            <div class="section-header">
+              <h2><i class="fab fa-telegram"></i> Telegram 转发</h2>
+              <button class="btn btn-primary btn-sm" onclick="saveTelegramConfig()">
+                <i class="fas fa-save"></i> 保存
+              </button>
+            </div>
+            <div class="adapter-form">
+              <div class="form-row">
+                <label><i class="fas fa-power-off"></i> 启用状态</label>
+                <select id="tgEnable">
+                  <option value="false">关闭</option>
+                  <option value="true">开启</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label><i class="fas fa-key"></i> Bot Token</label>
+                <input type="password" id="tgToken" placeholder="从 @BotFather 获取">
+              </div>
+              <div class="form-row">
+                <label><i class="fas fa-globe"></i> API Endpoint</label>
+                <input type="text" id="tgEndpoint" placeholder="留空使用默认 (api.telegram.org)">
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-header">
+              <h2><i class="fas fa-shield-halved"></i> Telegram 代理</h2>
+            </div>
+            <div class="adapter-form">
+              <div class="form-row">
+                <label><i class="fas fa-power-off"></i> 启用代理</label>
+                <select id="tgProxyEnable">
+                  <option value="false">关闭</option>
+                  <option value="true">开启</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label><i class="fas fa-link"></i> 代理地址</label>
+                <input type="text" id="tgProxyUrl" placeholder="http://127.0.0.1:7890">
+              </div>
+              <div class="detail-row" style="padding:12px 0 0;border-top:1px solid var(--border-light);margin-top:4px">
+                <span class="detail-label"><i class="fas fa-signal"></i> 状态</span>
+                <span class="status-badge" id="tgStatusBadge">未知</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compatible Clients -->
+        <div class="section-card">
+          <div class="section-header">
+            <h2><i class="fas fa-list-check"></i> 兼容客户端</h2>
+          </div>
+          <div class="adapter-clients-grid">
+            <div class="adapter-client-card">
+              <div class="client-header">
+                <div class="client-icon" style="background:rgba(88,166,255,0.15);color:var(--accent)">L</div>
+                <div>
+                  <div class="client-name">LLOneBot</div>
+                  <div class="client-desc">QQNT 协议实现</div>
+                </div>
+              </div>
+              <div class="client-body">
+                <div class="info-row"><span class="info-label">平台</span><span class="info-value">Windows</span></div>
+                <div class="info-row"><span class="info-label">协议</span><span class="info-value">OneBot v11</span></div>
+                <div class="info-row"><span class="info-label">推荐模式</span><span class="info-value">ws-reverse</span></div>
+              </div>
+              <div class="client-footer">
+                <a href="https://github.com/LLOneBot/LLOneBot" target="_blank" class="btn btn-sm">
+                  <i class="fas fa-external-link-alt"></i> GitHub
+                </a>
+              </div>
+            </div>
+
+            <div class="adapter-client-card">
+              <div class="client-header">
+                <div class="client-icon" style="background:rgba(63,185,80,0.15);color:var(--success)">N</div>
+                <div>
+                  <div class="client-name">NapCat</div>
+                  <div class="client-desc">QQNT 无头框架</div>
+                </div>
+              </div>
+              <div class="client-body">
+                <div class="info-row"><span class="info-label">平台</span><span class="info-value">Windows / Linux</span></div>
+                <div class="info-row"><span class="info-label">协议</span><span class="info-value">OneBot v11</span></div>
+                <div class="info-row"><span class="info-label">推荐模式</span><span class="info-value">ws-reverse</span></div>
+              </div>
+              <div class="client-footer">
+                <a href="https://github.com/NapNeko/NapCatQQ" target="_blank" class="btn btn-sm">
+                  <i class="fas fa-external-link-alt"></i> GitHub
+                </a>
+              </div>
+            </div>
+
+            <div class="adapter-client-card">
+              <div class="client-header">
+                <div class="client-icon" style="background:rgba(188,140,255,0.15);color:var(--purple)">L</div>
+                <div>
+                  <div class="client-name">Lagrange</div>
+                  <div class="client-desc">跨平台协议实现</div>
+                </div>
+              </div>
+              <div class="client-body">
+                <div class="info-row"><span class="info-label">平台</span><span class="info-value">Windows / Linux / macOS</span></div>
+                <div class="info-row"><span class="info-label">协议</span><span class="info-value">OneBot v11</span></div>
+                <div class="info-row"><span class="info-label">推荐模式</span><span class="info-value">ws-server</span></div>
+              </div>
+              <div class="client-footer">
+                <a href="https://github.com/LagrangeDev/Lagrange.Core" target="_blank" class="btn btn-sm">
+                  <i class="fas fa-external-link-alt"></i> GitHub
+                </a>
+              </div>
+            </div>
+
+            <div class="adapter-client-card">
+              <div class="client-header">
+                <div class="client-icon" style="background:rgba(210,153,34,0.15);color:var(--warning)">S</div>
+                <div>
+                  <div class="client-name">Satori</div>
+                  <div class="client-desc">通用协议框架</div>
+                </div>
+              </div>
+              <div class="client-body">
+                <div class="info-row"><span class="info-label">平台</span><span class="info-value">跨平台</span></div>
+                <div class="info-row"><span class="info-label">协议</span><span class="info-value">Satori</span></div>
+                <div class="info-row"><span class="info-label">推荐模式</span><span class="info-value">ws-reverse</span></div>
+              </div>
+              <div class="client-footer">
+                <a href="https://github.com/satorijs/satori" target="_blank" class="btn btn-sm">
+                  <i class="fas fa-external-link-alt"></i> GitHub
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connection Event Log -->
+        <div class="section-card">
+          <div class="section-header">
+            <h2><i class="fas fa-timeline"></i> 连接事件</h2>
+            <button class="btn btn-sm" onclick="clearAdapterEvents()">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+          <div class="adapter-events" id="adapterEvents">
+            <div class="log-empty">暂无连接事件</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Logs Page -->
+      <section class="page" id="page-logs">
+        <div class="page-header">
+          <h1><i class="fas fa-terminal"></i> 实时日志</h1>
+          <div class="header-actions">
+            <div class="log-filter">
+              <select id="logLevelFilter" onchange="filterLogs()">
+                <option value="all">全部级别</option>
+                <option value="info">Info</option>
+                <option value="warn">Warn</option>
+                <option value="error">Error</option>
+                <option value="debug">Debug</option>
+              </select>
+            </div>
+            <button class="btn btn-sm" onclick="clearLogs()" title="清空">
+              <i class="fas fa-trash"></i>
+            </button>
+            <button class="btn btn-sm" id="btnAutoScroll" onclick="toggleAutoScroll()" title="自动滚动">
+              <i class="fas fa-arrow-down"></i>
+            </button>
+          </div>
+        </div>
+        <div class="log-container">
+          <div class="log-terminal" id="logTerminal">
+            <div class="log-empty">等待日志输出...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Subscriptions Page -->
+      <section class="page" id="page-subscriptions">
+        <div class="page-header">
+          <h1><i class="fas fa-bell"></i> 订阅管理</h1>
+          <div class="header-actions">
+            <button class="btn btn-primary btn-sm" onclick="showAddSubModal()">
+              <i class="fas fa-plus"></i> 添加订阅
+            </button>
+          </div>
+        </div>
+
+        <div class="sub-stats" id="subStats">
+          <div class="stat-item">
+            <span class="stat-value" id="subTotal">0</span>
+            <span class="stat-label">总计</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value" id="subBilibili">0</span>
+            <span class="stat-label">B站</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value" id="subDouyu">0</span>
+            <span class="stat-label">斗鱼</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value" id="subYoutube">0</span>
+            <span class="stat-label">YouTube</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value" id="subOther">0</span>
+            <span class="stat-label">其他</span>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="sub-search">
+            <i class="fas fa-search"></i>
+            <input type="text" id="subSearch" placeholder="搜索订阅..." oninput="filterSubs()">
+          </div>
+          <div class="sub-table-wrap">
+            <table class="sub-table" id="subTable">
+              <thead>
+                <tr>
+                  <th>平台</th>
+                  <th>用户ID</th>
+                  <th>用户名</th>
+                  <th>类型</th>
+                  <th>群号</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="subTableBody">
+                <tr class="empty-row"><td colspan="7">暂无订阅，点击上方按钮添加</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings Page -->
+      <section class="page" id="page-settings">
+        <div class="page-header">
+          <h1><i class="fas fa-gear"></i> 设置</h1>
+          <div class="header-actions">
+            <button class="btn btn-sm" onclick="loadAllSettings()">
+              <i class="fas fa-refresh"></i> 重新加载
+            </button>
+          </div>
+        </div>
+
+        <!-- Settings Nav Tabs -->
+        <div class="settings-tabs">
+          <button class="settings-tab active" data-tab="cfg-bot" onclick="switchSettingsTab(this)">
+            <i class="fas fa-robot"></i> Bot
+          </button>
+          <button class="settings-tab" data-tab="cfg-bilibili" onclick="switchSettingsTab(this)">
+            <i class="fas fa-tv"></i> B站
+          </button>
+          <button class="settings-tab" data-tab="cfg-platforms" onclick="switchSettingsTab(this)">
+            <i class="fas fa-globe"></i> 其他平台
+          </button>
+          <button class="settings-tab" data-tab="cfg-notify" onclick="switchSettingsTab(this)">
+            <i class="fas fa-bell"></i> 订阅与通知
+          </button>
+          <button class="settings-tab" data-tab="cfg-advanced" onclick="switchSettingsTab(this)">
+            <i class="fas fa-sliders"></i> 高级
+          </button>
+          <button class="settings-tab" data-tab="cfg-raw" onclick="switchSettingsTab(this)">
+            <i class="fas fa-file-code"></i> 原始配置
+          </button>
+        </div>
+
+        <!-- Tab: Bot 基本 -->
+        <div class="settings-tab-content active" id="cfg-bot">
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-terminal"></i> 命令与交互</div>
+            <div class="setting-field">
+              <div class="setting-field-label">命令前缀</div>
+              <input type="text" id="cfg_commandPrefix" placeholder="/" data-path="bot.commandPrefix">
+              <div class="setting-field-hint">触发 Bot 命令的前缀字符，默认为 <code>/</code></div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">进群自动改名</div>
+              <input type="text" id="cfg_rename" placeholder="【bot】" data-path="bot.onJoinGroup.rename">
+              <div class="setting-field-hint">Bot 加入群聊后的自动昵称，留空则不改名</div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-wifi"></i> 连接与掉线</div>
+            <div class="setting-field">
+              <div class="setting-field-label">掉线处理方式</div>
+              <select id="cfg_onDisconnected" data-path="bot.onDisconnected">
+                <option value="">重连 (默认)</option>
+                <option value="exit">退出进程</option>
+              </select>
+              <div class="setting-field-hint">与 OneBot 断开连接后的行为：<code>exit</code> 直接退出，其他值尝试重连</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">发送失败提醒</div>
+              <select id="cfg_sendFailureReminder" data-path="bot.sendFailureReminder.enable">
+                <option value="false">关闭</option>
+                <option value="true">开启</option>
+              </select>
+              <div class="setting-field-hint">消息发送失败达到阈值后触发提醒模板</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">失败次数阈值</div>
+              <input type="number" id="cfg_sendFailureTimes" min="1" max="100" value="3" data-path="bot.sendFailureReminder.times">
+              <div class="setting-field-hint">连续失败多少次后触发提醒，默认 3</div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-box-archive"></i> 离线消息队列</div>
+            <div class="setting-field">
+              <div class="setting-field-label">启用离线缓存</div>
+              <select id="cfg_offlineQueue" data-path="bot.offlineQueue.enable">
+                <option value="false">关闭</option>
+                <option value="true">开启</option>
+              </select>
+              <div class="setting-field-hint">Bot 离线期间暂存消息，上线后重新发送（期间不能重启）</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">缓存有效期</div>
+              <input type="text" id="cfg_offlineExpire" placeholder="30m" data-path="bot.offlineQueue.expire">
+              <div class="setting-field-hint">离线消息的有效期，超时丢弃。格式如 <code>30m</code>、<code>1h</code></div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-folder-open"></i> WebUI 设置</div>
+            <div class="setting-field">
+              <div class="setting-field-label">Bot 可执行文件路径</div>
+              <div style="display:flex;gap:8px">
+                <input type="text" id="exePathInput" placeholder="自动检测" style="flex:1" data-path="__exePath">
+                <button class="btn btn-sm btn-primary" onclick="saveExePath()"><i class="fas fa-save"></i></button>
+              </div>
+              <div class="setting-field-hint" id="exePathCurrent">-</div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" onclick="saveSettingsSection('cfg-bot')" style="margin-top:8px">
+            <i class="fas fa-save"></i> 保存 Bot 设置
+          </button>
+        </div>
+
+        <!-- Tab: B站 -->
+        <div class="settings-tab-content" id="cfg-bilibili">
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-cookie-bite"></i> B站账号</div>
+            <div class="setting-field">
+              <div class="setting-field-label">SESSDATA</div>
+              <input type="password" id="cfg_bili_sessdata" placeholder="从浏览器 Cookie 获取" data-path="bilibili.SESSDATA">
+              <div class="setting-field-hint">B站登录 Cookie，用于获取动态和关注列表。与 QR 登录二选一</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">bili_jct</div>
+              <input type="password" id="cfg_bili_jct" placeholder="从浏览器 Cookie 获取" data-path="bilibili.bili_jct">
+              <div class="setting-field-hint">B站 CSRF Token，需与 SESSDATA 配对使用</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">二维码登录</div>
+              <select id="cfg_bili_qrlogin" data-path="bilibili.qrlogin">
+                <option value="true">开启</option>
+                <option value="false">关闭</option>
+              </select>
+              <div class="setting-field-hint">Cookie 失效时自动弹出二维码重新登录</div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-gauge"></i> 轮询与行为</div>
+            <div class="setting-field">
+              <div class="setting-field-label">轮询间隔</div>
+              <input type="text" id="cfg_bili_interval" placeholder="25s" data-path="bilibili.interval">
+              <div class="setting-field-hint">检测直播/动态更新的间隔，过快可能被风控。格式如 <code>25s</code></div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">图片合并模式</div>
+              <select id="cfg_bili_imageMerge" data-path="bilibili.imageMergeMode">
+                <option value="auto">自动 (auto)</option>
+                <option value="only9">仅9张 (only9)</option>
+                <option value="off">关闭 (off)</option>
+              </select>
+              <div class="setting-field-hint">多图动态的合并策略：<code>auto</code> 智能合并，<code>only9</code> 仅恰好9张时合并</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">仅推送在线期间动态</div>
+              <select id="cfg_bili_onlyOnline" data-path="bilibili.onlyOnlineNotify">
+                <option value="false">否，推送所有</option>
+                <option value="true">是，仅在线时</option>
+              </select>
+              <div class="setting-field-hint">是否跳过 Bot 离线期间产生的动态和直播通知</div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-sliders"></i> 高级选项</div>
+            <div class="setting-field">
+              <div class="setting-field-label">悄悄关注</div>
+              <select id="cfg_bili_hiddenSub" data-path="bilibili.hiddenSub">
+                <option value="false">关闭</option>
+                <option value="true">开启</option>
+              </select>
+              <div class="setting-field-hint">使用 B站悄悄关注功能，对方不会看到关注记录</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">取消订阅时取关</div>
+              <select id="cfg_bili_unsub" data-path="bilibili.unsub">
+                <option value="false">否</option>
+                <option value="true">是</option>
+              </select>
+              <div class="setting-field-hint">取消订阅后是否自动取消 B站关注。多 Bot 共用账号时建议关闭</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">禁止自动关注</div>
+              <select id="cfg_bili_disableSub" data-path="bilibili.disableSub">
+                <option value="false">否</option>
+                <option value="true">是</option>
+              </select>
+              <div class="setting-field-hint">禁止 Bot 在 B站自动关注，只能订阅已手动关注的用户</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">最低粉丝数要求</div>
+              <input type="number" id="cfg_bili_minFollower" min="-1" value="0" data-path="bilibili.minFollowerCap">
+              <div class="setting-field-hint">订阅用户需满足的最低粉丝数，<code>0</code> 无限制，<code>-1</code> 不限</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">自动解析专栏</div>
+              <select id="cfg_bili_autoParsePosts" data-path="bilibili.autoParsePosts">
+                <option value="false">关闭</option>
+                <option value="true">开启</option>
+              </select>
+              <div class="setting-field-hint">将专栏动态的推送内容改为专栏正文</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">动态二次解析</div>
+              <select id="cfg_bili_secAnalysis" data-path="bilibili.secAnalysis">
+                <option value="false">关闭</option>
+                <option value="true">开启</option>
+              </select>
+              <div class="setting-field-hint">对动态内容进行二次解析以获取更多信息（实验性）</div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" onclick="saveSettingsSection('cfg-bilibili')" style="margin-top:8px">
+            <i class="fas fa-save"></i> 保存 B站设置
+          </button>
+        </div>
+
+        <!-- Tab: 其他平台 -->
+        <div class="settings-tab-content" id="cfg-platforms">
+          <!-- AcFun -->
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-a"></i> AcFun</div>
+            <div class="setting-field">
+              <div class="setting-field-label">账号</div>
+              <input type="text" id="cfg_acfun_account" placeholder="AcFun 账号" data-path="acfun.account">
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">密码</div>
+              <input type="password" id="cfg_acfun_password" placeholder="AcFun 密码" data-path="acfun.password">
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">轮询间隔</div>
+              <input type="text" id="cfg_acfun_interval" placeholder="25s" data-path="acfun.interval">
+              <div class="setting-field-hint">检测 AcFun 直播/动态的间隔</div>
+            </div>
+          </div>
+
+          <!-- 微博 -->
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-comment-dots"></i> 微博</div>
+            <div class="setting-field">
+              <div class="setting-field-label">运行模式</div>
+              <select id="cfg_weibo_mode" data-path="weibo.mode">
+                <option value="guest">访客模式 (guest)</option>
+                <option value="login">登录模式 (login)</option>
+                <option value="api">API 模式 (api)</option>
+              </select>
+              <div class="setting-field-hint"><code>guest</code> 自动生成临时 Cookie；<code>login</code> 需配置 Cookie；<code>api</code> 使用外部 API</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">轮询间隔</div>
+              <input type="text" id="cfg_weibo_interval" placeholder="30s" data-path="weibo.interval">
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">二维码登录</div>
+              <select id="cfg_weibo_qrlogin" data-path="weibo.qrlogin">
+                <option value="true">开启</option>
+                <option value="false">关闭</option>
+              </select>
+              <div class="setting-field-hint">Cookie 失效时自动弹出二维码重新登录（仅 login 模式）</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">SUB Cookie</div>
+              <input type="password" id="cfg_weibo_sub" placeholder="weibo.com 登录 Cookie" data-path="weibo.sub">
+              <div class="setting-field-hint">登录 weibo.com 后获取的 SUB Cookie（login 模式可选）</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">API 基础地址</div>
+              <input type="text" id="cfg_weibo_apiBase" placeholder="http://127.0.0.1:5000" data-path="weibo.apiModeBaseURL">
+              <div class="setting-field-hint">API 模式的基础 URL，完整地址为 <code>{baseURL}/api/Weibo/GetMobileCards?uid=uid</code></div>
+            </div>
+          </div>
+
+          <!-- Twitter -->
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fab fa-twitter"></i> Twitter / X</div>
+            <div class="setting-field">
+              <div class="setting-field-label">运行模式</div>
+              <select id="cfg_twitter_mode" data-path="twitter.mode">
+                <option value="mirror">镜像模式 (mirror)</option>
+                <option value="api">API 模式 (api)</option>
+              </select>
+              <div class="setting-field-hint"><code>mirror</code> 通过 nitter 镜像获取，无需账号；<code>api</code> 使用 Twitter API，需 Cookie</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">轮询间隔</div>
+              <input type="text" id="cfg_twitter_interval" placeholder="30s" data-path="twitter.interval">
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">Nitter 镜像列表</div>
+              <textarea id="cfg_twitter_baseUrl" rows="4" placeholder="每行一个地址&#10;https://nitter.net/" data-path="twitter.baseUrl" data-type="array"></textarea>
+              <div class="setting-field-hint">mirror 模式下使用的 nitter 镜像地址，每行一个</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">auth_token</div>
+              <input type="password" id="cfg_twitter_authToken" placeholder="Twitter Cookie" data-path="twitter.auth_token">
+              <div class="setting-field-hint">api 模式：登录 Twitter 后从 Cookie 获取的 auth_token</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">ct0</div>
+              <input type="password" id="cfg_twitter_ct0" placeholder="Twitter Cookie" data-path="twitter.ct0">
+              <div class="setting-field-hint">api 模式：登录 Twitter 后从 Cookie 获取的 ct0</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">Bearer Token</div>
+              <input type="password" id="cfg_twitter_bearer" placeholder="Twitter API Bearer Token" data-path="twitter.bearerToken">
+              <div class="setting-field-hint">api 模式：Twitter API Bearer Token</div>
+            </div>
+          </div>
+
+          <!-- 抖音 -->
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-music"></i> 抖音</div>
+            <div class="setting-field">
+              <div class="setting-field-label">轮询间隔</div>
+              <input type="text" id="cfg_douyin_interval" placeholder="30s" data-path="douyin.interval">
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">ac_signature</div>
+              <input type="password" id="cfg_douyin_acSig" placeholder="浏览器 Cookie" data-path="douyin.acSignature">
+              <div class="setting-field-hint">访问 www.douyin.com 后从 Cookie 中获取</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">ac_nonce</div>
+              <input type="password" id="cfg_douyin_acNonce" placeholder="浏览器 Cookie" data-path="douyin.acNonce">
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">sessionId</div>
+              <input type="password" id="cfg_douyin_session" placeholder="浏览器 Cookie" data-path="douyin.sessionId">
+            </div>
+          </div>
+
+          <!-- YouTube -->
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fab fa-youtube"></i> YouTube</div>
+            <div class="setting-field">
+              <div class="setting-field-label">仅推送在线期间</div>
+              <select id="cfg_yt_onlyOnline" data-path="youtube.onlyOnlineNotify">
+                <option value="true">是</option>
+                <option value="false">否</option>
+              </select>
+              <div class="setting-field-hint">是否跳过 Bot 离线期间的视频和直播通知</div>
+            </div>
+          </div>
+
+          <!-- 小红书 -->
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-book-open"></i> 小红书</div>
+            <div class="setting-field">
+              <div class="setting-field-label">a1 Cookie</div>
+              <input type="password" id="cfg_xhs_a1" placeholder="小红书 a1 cookie" data-path="xhs.cookies.a1">
+              <div class="setting-field-hint">必需的 Cookie，用于获取直播间信息</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">web_session</div>
+              <input type="password" id="cfg_xhs_ws" placeholder="小红书 web_session" data-path="xhs.cookies.web_session">
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">轮询间隔</div>
+              <input type="text" id="cfg_xhs_interval" placeholder="15s" data-path="xhs.interval">
+            </div>
+          </div>
+
+          <!-- Twitch -->
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fab fa-twitch"></i> Twitch</div>
+            <div class="setting-field">
+              <div class="setting-field-label">Client ID</div>
+              <input type="password" id="cfg_twitch_cid" placeholder="Twitch 应用 Client ID" data-path="twitch.clientId">
+              <div class="setting-field-hint">在 <a href="https://dev.twitch.tv/console/apps" target="_blank">Twitch 开发者后台</a> 注册应用获取</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">Client Secret</div>
+              <input type="password" id="cfg_twitch_csec" placeholder="Twitch 应用 Client Secret" data-path="twitch.clientSecret">
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">轮询间隔</div>
+              <input type="text" id="cfg_twitch_interval" placeholder="30s" data-path="twitch.interval">
+            </div>
+          </div>
+
+          <!-- TwitCasting -->
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-video"></i> TwitCasting</div>
+            <div class="setting-field">
+              <div class="setting-field-label">Client ID</div>
+              <input type="password" id="cfg_tc_cid" placeholder="TwitCasting App Client ID" data-path="twitcasting.clientId">
+              <div class="setting-field-hint">在 <a href="https://twitcasting.tv/developer.php" target="_blank">TwitCasting 开发者后台</a> 注册获取</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">Client Secret</div>
+              <input type="password" id="cfg_tc_csec" placeholder="TwitCasting App Client Secret" data-path="twitcasting.clientSecret">
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">名称显示策略</div>
+              <select id="cfg_tc_nameStrategy" data-path="twitcasting.nameStrategy">
+                <option value="name">用户名 (name)</option>
+                <option value="userid">用户ID (userid)</option>
+                <option value="both">两者都显示 (both)</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" onclick="saveSettingsSection('cfg-platforms')" style="margin-top:8px">
+            <i class="fas fa-save"></i> 保存平台设置
+          </button>
+        </div>
+
+        <!-- Tab: 订阅与通知 -->
+        <div class="settings-tab-content" id="cfg-notify">
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-arrows-spin"></i> 轮询设置</div>
+            <div class="setting-field">
+              <div class="setting-field-label">全局轮询间隔</div>
+              <input type="number" id="cfg_emitInterval" min="1" max="60" value="5" data-path="concern.emitInterval">
+              <div class="setting-field-hint">订阅刷新频率（秒），每 N 秒刷新一个 ID。过快可能导致 IP 被封</div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-file-code"></i> 模板功能</div>
+            <div class="setting-field">
+              <div class="setting-field-label">启用模板</div>
+              <select id="cfg_templateEnable" data-path="template.enable">
+                <option value="true">开启</option>
+                <option value="false">关闭</option>
+              </select>
+              <div class="setting-field-hint">启用后可通过模板自定义消息格式和自动回复命令</div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-reply"></i> 自动回复</div>
+            <div class="setting-field">
+              <div class="setting-field-label">群命令</div>
+              <textarea id="cfg_autoreplyGroup" rows="3" placeholder="每行一个命令&#10;签到" data-path="autoreply.group.command" data-type="array"></textarea>
+              <div class="setting-field-hint">群聊中触发的自定义命令列表（需启用模板），每行一个</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">私聊命令</div>
+              <textarea id="cfg_autoreplyPrivate" rows="3" placeholder="每行一个命令" data-path="autoreply.private.command" data-type="array"></textarea>
+              <div class="setting-field-hint">私聊中触发的自定义命令列表</div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" onclick="saveSettingsSection('cfg-notify')" style="margin-top:8px">
+            <i class="fas fa-save"></i> 保存通知设置
+          </button>
+        </div>
+
+        <!-- Tab: 高级 -->
+        <div class="settings-tab-content" id="cfg-advanced">
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-bug"></i> 日志与调试</div>
+            <div class="setting-field">
+              <div class="setting-field-label">日志级别</div>
+              <select id="cfg_logLevel" data-path="logLevel">
+                <option value="trace">Trace (最详细)</option>
+                <option value="debug">Debug</option>
+                <option value="info">Info (默认)</option>
+                <option value="warn">Warn</option>
+                <option value="error">Error (最少)</option>
+              </select>
+              <div class="setting-field-hint">日志输出的详细程度，生产环境推荐 <code>info</code></div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">QQ 消息日志</div>
+              <select id="cfg_qqlogs" data-path="qq-logs.enable">
+                <option value="true">开启</option>
+                <option value="false">关闭</option>
+              </select>
+              <div class="setting-field-hint">在命令行展示收发的 QQ 消息内容，输出到 <code>qq-logs/</code> 目录</div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-database"></i> 数据库</div>
+            <div class="setting-field">
+              <div class="setting-field-label">扩展数据库</div>
+              <select id="cfg_extDb" data-path="extDb.enable">
+                <option value="false">关闭</option>
+                <option value="true">开启</option>
+              </select>
+              <div class="setting-field-hint">启用独立的扩展数据库文件，避免写入主 <code>.lsp.db</code></div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">扩展数据库路径</div>
+              <input type="text" id="cfg_extDbPath" placeholder=".ext.db" data-path="extDb.path">
+              <div class="setting-field-hint">扩展数据库的文件名或路径</div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-server"></i> 管理后台</div>
+            <div class="setting-field">
+              <div class="setting-field-label">启用管理后台</div>
+              <select id="cfg_adminEnable" data-path="admin.enable">
+                <option value="false">关闭</option>
+                <option value="true">开启</option>
+              </select>
+              <div class="setting-field-hint">启用内置的 HTTP 管理后台</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">监听地址</div>
+              <input type="text" id="cfg_adminAddr" placeholder="127.0.0.1:15631" data-path="admin.addr">
+              <div class="setting-field-hint">管理后台的监听地址</div>
+            </div>
+            <div class="setting-field">
+              <div class="setting-field-label">管理令牌</div>
+              <input type="password" id="cfg_adminToken" placeholder="留空表示无令牌" data-path="admin.token">
+            </div>
+          </div>
+
+          <button class="btn btn-primary" onclick="saveSettingsSection('cfg-advanced')" style="margin-top:8px">
+            <i class="fas fa-save"></i> 保存高级设置
+          </button>
+        </div>
+
+        <!-- Tab: 原始配置 -->
+        <div class="settings-tab-content" id="cfg-raw">
+          <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-file-code"></i> application.yaml 原始编辑器</div>
+            <div style="padding:0 0 12px">
+              <div class="editor-wrap" style="border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)">
+                <textarea id="configEditor" spellcheck="false" placeholder="加载中..." style="min-height:500px"></textarea>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+                <span class="editor-hint">直接编辑 YAML 配置文件，修改后点击保存立即生效</span>
+                <button class="btn btn-primary btn-sm" onclick="saveRawConfig()">
+                  <i class="fas fa-save"></i> 保存原始配置
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Add Subscription Modal -->
+  <div class="modal-overlay" id="addSubModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-plus-circle"></i> 添加订阅</h3>
+        <button class="modal-close" onclick="closeModal('addSubModal')">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>平台</label>
+          <select id="subSite">
+            <option value="bilibili">哔哩哔哩 (Bilibili)</option>
+            <option value="douyu">斗鱼 (Douyu)</option>
+            <option value="youtube">YouTube</option>
+            <option value="huya">虎牙 (Huya)</option>
+            <option value="acfun">AcFun</option>
+            <option value="weibo">微博 (Weibo)</option>
+            <option value="twitter">Twitter / X</option>
+            <option value="douyin">抖音 (Douyin)</option>
+            <option value="twitch">Twitch</option>
+            <option value="twitcasting">TwitCasting</option>
+            <option value="xhs">小红书 (XHS)</option>
+            <option value="xhh">小黑盒 (XHH)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>订阅类型</label>
+          <div id="subTypeCheckboxes" class="checkbox-group">
+            <label class="checkbox-item"><input type="checkbox" value="live" checked> 直播</label>
+            <label class="checkbox-item"><input type="checkbox" value="news"> 动态/视频</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>用户ID / 房间号</label>
+          <input type="text" id="subId" placeholder="例如：21652717 (B站UID)">
+        </div>
+        <div class="form-group">
+          <label>备注名 (可选)</label>
+          <input type="text" id="subName" placeholder="例如：某UP主">
+        </div>
+        <div class="form-group">
+          <label>目标群号</label>
+          <input type="text" id="subGroup" placeholder="接收通知的QQ群号">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('addSubModal')">取消</button>
+        <button class="btn btn-primary" onclick="addSubscription()">
+          <i class="fas fa-check"></i> 添加
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Subscription Modal -->
+  <div class="modal-overlay" id="editSubModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-pen-to-square"></i> 编辑订阅</h3>
+        <button class="modal-close" onclick="closeModal('editSubModal')">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editSubId">
+        <input type="hidden" id="editSubSite">
+        <input type="hidden" id="editSubGroupCode">
+        <div class="form-group">
+          <label>平台 / 用户</label>
+          <div id="editSubInfo" style="font-size:13px;color:var(--text-secondary);padding:4px 0">-</div>
+        </div>
+        <div class="form-group">
+          <label>订阅类型</label>
+          <div id="editSubTypeCheckboxes" class="checkbox-group">
+            <label class="checkbox-item"><input type="checkbox" value="live"> 直播</label>
+            <label class="checkbox-item"><input type="checkbox" value="news"> 动态/视频</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('editSubModal')">取消</button>
+        <button class="btn btn-primary" onclick="saveEditSub()">
+          <i class="fas fa-check"></i> 保存
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

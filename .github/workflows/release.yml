@@ -1,0 +1,245 @@
+name: Build & Pre-Release
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '*.md'
+      - '.gitignore'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows
+          - os: windows-latest
+            platform: windows
+            arch: amd64
+            ext: .exe
+            artifact_ext: .exe
+
+          - os: windows-latest
+            platform: windows
+            arch: 386
+            ext: .exe
+            artifact_ext: .exe
+            node_arch: x86
+
+          - os: windows-latest
+            platform: windows
+            arch: arm64
+            ext: .exe
+            artifact_ext: .exe
+            node_arch: arm64
+
+          - os: windows-latest
+            platform: windows
+            arch: arm
+            ext: .exe
+            artifact_ext: .exe
+            node_arch: arm
+
+          # Linux
+          - os: ubuntu-latest
+            platform: linux
+            arch: amd64
+            ext: ""
+            artifact_ext: ""
+
+          - os: ubuntu-latest
+            platform: linux
+            arch: 386
+            ext: ""
+            artifact_ext: ""
+            node_arch: x86
+
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            ext: ""
+            artifact_ext: ""
+
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm
+            ext: ""
+            artifact_ext: ""
+            node_arch: arm
+
+          # macOS
+          - os: macos-13
+            platform: darwin
+            arch: amd64
+            ext: ""
+            artifact_ext: ""
+
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            ext: ""
+            artifact_ext: ""
+
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.platform }}-${{ matrix.arch }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          architecture: ${{ matrix.node_arch || 'x64' }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install caxa
+        run: npm install caxa --save-dev
+
+      - name: Build executable
+        shell: bash
+        run: |
+          mkdir -p dist
+          OUTPUT="dist/ddbot-wsa-webui${{ matrix.ext }}"
+
+          npx caxa --input . --output "$OUTPUT" \
+            --exclude 'dist/**' '.git/**' 'node_modules/.cache/**' '.github/**' \
+            --no-dedupe \
+            -- "{{caxa}}/node_modules/.bin/node" "{{caxa}}/server.js"
+
+          if [ "${{ matrix.platform }}" != "windows" ]; then
+            chmod +x "$OUTPUT"
+          fi
+
+      - name: Rename artifact
+        shell: bash
+        run: |
+          cd dist
+          NAME="ddbot-wsa-webui-${{ matrix.platform }}-${{ matrix.arch }}"
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            mv "ddbot-wsa-webui.exe" "${NAME}.exe"
+            echo "asset=${NAME}.exe" >> $GITHUB_ENV
+          else
+            mv "ddbot-wsa-webui" "${NAME}"
+            echo "asset=${NAME}" >> $GITHUB_ENV
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.asset }}
+          path: dist/${{ env.asset }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version tag
+        id: version
+        run: |
+          DATE=$(date +'%Y%m%d')
+          COUNT=$(git log --since="midnight" --oneline | wc -l | tr -d ' ')
+          TAG="v0.${DATE}.${COUNT}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "date=$(date +'%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --oneline --no-decorate -30)
+          else
+            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --no-decorate)
+          fi
+
+          {
+            echo "## 📦 DDBOT-WSa WebUI ${{ steps.version.outputs.tag }}"
+            echo ""
+            echo "构建时间: ${{ steps.version.outputs.date }}"
+            echo ""
+
+            FEATURES=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ feat" || true)
+            FIXES=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ fix" || true)
+            DOCS=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ docs" || true)
+            OTHERS=$(echo "$COMMITS" | grep -ivE "^[a-f0-9]+ (feat|fix|docs)" || true)
+
+            if [ -n "$FEATURES" ]; then
+              echo "### 🚀 新功能"
+              echo "$FEATURES" | sed 's/^[a-f0-9]*/-/'
+              echo ""
+            fi
+
+            if [ -n "$FIXES" ]; then
+              echo "### 🐛 修复"
+              echo "$FIXES" | sed 's/^[a-f0-9]*/-/'
+              echo ""
+            fi
+
+            if [ -n "$DOCS" ]; then
+              echo "### 📝 文档"
+              echo "$DOCS" | sed 's/^[a-f0-9]*/-/'
+              echo ""
+            fi
+
+            if [ -n "$OTHERS" ]; then
+              echo "### ⚡ 其他"
+              echo "$OTHERS" | sed 's/^[a-f0-9]*/-/'
+              echo ""
+            fi
+
+            echo "---"
+            echo ""
+            echo "### 📥 下载说明"
+            echo ""
+            echo "| 文件 | 平台 | 架构 |"
+            echo "|------|------|------|"
+            echo "| \`*-windows-*.exe\` | Windows | x64 / x86 / ARM / ARM64 |"
+            echo "| \`*-linux-*\` | Linux | x64 / x86 / ARM / ARM64 |"
+            echo "| \`*-darwin-*\` | macOS | x64 (Intel) / ARM64 (Apple Silicon) |"
+            echo ""
+            echo "下载对应平台的文件，直接运行即可，无需安装 Node.js。"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**完整变更**: https://github.com/${{ github.repository }}/compare/${LAST_TAG:-$(git rev-list --max-parents=0 HEAD | head -1)}...${{ steps.version.outputs.tag }}"
+          } > changelog.md
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          cat changelog.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
+
+      - name: Create GitHub Pre-Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "DDBOT-WSa WebUI ${{ steps.version.outputs.tag }}"
+          body: ${{ steps.changelog.outputs.body }}
+          prerelease: true
+          generate_release_notes: true
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
