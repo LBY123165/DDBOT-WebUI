@@ -16,73 +16,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Windows
+          # Windows x64
           - os: windows-latest
             platform: windows
             arch: amd64
             ext: .exe
-            artifact_ext: .exe
 
-          - os: windows-latest
-            platform: windows
-            arch: 386
-            ext: .exe
-            artifact_ext: .exe
-            node_arch: x86
-
-          - os: windows-latest
-            platform: windows
-            arch: arm64
-            ext: .exe
-            artifact_ext: .exe
-            node_arch: arm64
-
-          - os: windows-latest
-            platform: windows
-            arch: arm
-            ext: .exe
-            artifact_ext: .exe
-            node_arch: arm
-
-          # Linux
+          # Linux x64
           - os: ubuntu-latest
             platform: linux
             arch: amd64
             ext: ""
-            artifact_ext: ""
 
-          - os: ubuntu-latest
-            platform: linux
-            arch: 386
-            ext: ""
-            artifact_ext: ""
-            node_arch: x86
-
+          # Linux ARM64 (native ARM runner)
           - os: ubuntu-24.04-arm
             platform: linux
             arch: arm64
             ext: ""
-            artifact_ext: ""
 
-          - os: ubuntu-latest
-            platform: linux
-            arch: arm
-            ext: ""
-            artifact_ext: ""
-            node_arch: arm
-
-          # macOS
-          - os: macos-13
-            platform: darwin
-            arch: amd64
-            ext: ""
-            artifact_ext: ""
-
+          # macOS Apple Silicon (Intel Mac 已淘汰)
           - os: macos-latest
             platform: darwin
             arch: arm64
             ext: ""
-            artifact_ext: ""
 
     runs-on: ${{ matrix.os }}
     name: Build (${{ matrix.platform }}-${{ matrix.arch }})
@@ -94,8 +50,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          architecture: ${{ matrix.node_arch || 'x64' }}
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -104,14 +59,41 @@ jobs:
       - name: Install caxa
         run: npm install caxa --save-dev
 
+      - name: Prepare build directory
+        shell: bash
+        run: |
+          mkdir -p .build
+
+          cp server.js .build/
+          cp package.json .build/
+          cp -r lib .build/
+          cp -r public .build/
+
+          cd .build
+          npm install --omit=dev --ignore-scripts
+
+          # Clean unnecessary files from node_modules
+          find node_modules -name "*.md" -not -path "*/node_modules/.package-lock.json" -delete 2>/dev/null || true
+          find node_modules -name "README*" -delete 2>/dev/null || true
+          find node_modules -name "LICENSE*" -delete 2>/dev/null || true
+          find node_modules -name "CHANGELOG*" -delete 2>/dev/null || true
+          find node_modules -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "__tests__" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "doc" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "example" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name ".github" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "*.map" -delete 2>/dev/null || true
+          find node_modules -name "*.d.ts" -delete 2>/dev/null || true
+
       - name: Build executable
         shell: bash
         run: |
           mkdir -p dist
           OUTPUT="dist/ddbot-wsa-webui${{ matrix.ext }}"
 
-          npx caxa --input . --output "$OUTPUT" \
-            --exclude 'dist/**' '.git/**' 'node_modules/.cache/**' '.github/**' \
+          npx caxa --input .build --output "$OUTPUT" \
             --no-dedupe \
             -- "{{caxa}}/node_modules/.bin/node" "{{caxa}}/server.js"
 
@@ -138,8 +120,56 @@ jobs:
           name: ${{ env.asset }}
           path: dist/${{ env.asset }}
 
+  # Linux ARM32 via QEMU (armv7/armhf)
+  build-arm:
+    runs-on: ubuntu-latest
+    name: Build (linux-arm)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm/v7
+
+      - name: Build in ARM32 container
+        run: |
+          docker run --rm --platform linux/arm/v7 \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            node:20-bookworm-slim \
+            bash -c '
+              mkdir -p .build
+              cp server.js .build/
+              cp package.json .build/
+              cp -r lib .build/
+              cp -r public .build/
+              cd .build
+              npm install --omit=dev --ignore-scripts
+              npm install caxa --save-dev
+              npx caxa --input . --output /workspace/dist/ddbot-wsa-webui \
+                --no-dedupe \
+                -- "{{caxa}}/node_modules/.bin/node" "{{caxa}}/server.js"
+              chmod +x /workspace/dist/ddbot-wsa-webui
+            '
+
+      - name: Rename artifact
+        run: |
+          sudo chown -R $(id -u):$(id -g) dist/
+          cd dist
+          mv ddbot-wsa-webui ddbot-wsa-webui-linux-arm
+          echo "asset=ddbot-wsa-webui-linux-arm" >> $GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.asset }}
+          path: dist/${{ env.asset }}
+
   release:
-    needs: build
+    needs: [build, build-arm]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
@@ -163,61 +193,121 @@ jobs:
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
-            COMMITS=$(git log --oneline --no-decorate -30)
+            COMPARE_BASE=$(git rev-list --max-parents=0 HEAD | head -1)
           else
-            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --no-decorate)
+            COMPARE_BASE="$LAST_TAG"
           fi
+          COMMIT_COUNT=$(git log ${COMPARE_BASE}..HEAD --oneline | wc -l | tr -d ' ')
 
           {
-            echo "## 📦 DDBOT-WSa WebUI ${{ steps.version.outputs.tag }}"
+            echo "<div align=\"center\">"
             echo ""
-            echo "构建时间: ${{ steps.version.outputs.date }}"
+            echo "# 🤖 DDBOT-WSa WebUI"
             echo ""
-
-            FEATURES=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ feat" || true)
-            FIXES=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ fix" || true)
-            DOCS=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ docs" || true)
-            OTHERS=$(echo "$COMMITS" | grep -ivE "^[a-f0-9]+ (feat|fix|docs)" || true)
-
-            if [ -n "$FEATURES" ]; then
-              echo "### 🚀 新功能"
-              echo "$FEATURES" | sed 's/^[a-f0-9]*/-/'
-              echo ""
-            fi
-
-            if [ -n "$FIXES" ]; then
-              echo "### 🐛 修复"
-              echo "$FIXES" | sed 's/^[a-f0-9]*/-/'
-              echo ""
-            fi
-
-            if [ -n "$DOCS" ]; then
-              echo "### 📝 文档"
-              echo "$DOCS" | sed 's/^[a-f0-9]*/-/'
-              echo ""
-            fi
-
-            if [ -n "$OTHERS" ]; then
-              echo "### ⚡ 其他"
-              echo "$OTHERS" | sed 's/^[a-f0-9]*/-/'
-              echo ""
-            fi
-
-            echo "---"
+            echo "**${{ steps.version.outputs.tag }}** · ${COMMIT_COUNT} commits since ${COMPARE_BASE:0:7}"
             echo ""
-            echo "### 📥 下载说明"
+            echo "DDBOT-WSa 的 Web 管理面板 · 通过浏览器管理 Bot 进程、订阅、配置、日志"
             echo ""
-            echo "| 文件 | 平台 | 架构 |"
-            echo "|------|------|------|"
-            echo "| \`*-windows-*.exe\` | Windows | x64 / x86 / ARM / ARM64 |"
-            echo "| \`*-linux-*\` | Linux | x64 / x86 / ARM / ARM64 |"
-            echo "| \`*-darwin-*\` | macOS | x64 (Intel) / ARM64 (Apple Silicon) |"
-            echo ""
-            echo "下载对应平台的文件，直接运行即可，无需安装 Node.js。"
+            echo "</div>"
             echo ""
             echo "---"
             echo ""
-            echo "**完整变更**: https://github.com/${{ github.repository }}/compare/${LAST_TAG:-$(git rev-list --max-parents=0 HEAD | head -1)}...${{ steps.version.outputs.tag }}"
+            echo "## 📋 更新日志"
+            echo ""
+
+            # Use git log with full body for each commit
+            while IFS= read -r line; do
+              HASH=$(echo "$line" | cut -d'|' -f1)
+              SUBJECT=$(echo "$line" | cut -d'|' -f2-)
+
+              # Determine type emoji
+              if echo "$SUBJECT" | grep -qiE "^feat"; then
+                TYPE="🚀"
+              elif echo "$SUBJECT" | grep -qiE "^fix"; then
+                TYPE="🐛"
+              elif echo "$SUBJECT" | grep -qiE "^perf"; then
+                TYPE="⚡"
+              elif echo "$SUBJECT" | grep -qiE "^docs"; then
+                TYPE="📝"
+              elif echo "$SUBJECT" | grep -qiE "^ci"; then
+                TYPE="🔧"
+              else
+                TYPE="📦"
+              fi
+
+              echo "- ${TYPE} ${SUBJECT}"
+
+              # Append commit body (detailed description) if exists
+              BODY=$(git log -1 --format='%b' "$HASH" 2>/dev/null)
+              if [ -n "$BODY" ]; then
+                echo "$BODY" | while IFS= read -r bline; do
+                  if [ -n "$bline" ]; then
+                    echo "  ${bline}"
+                  fi
+                done
+              fi
+            done < <(git log ${COMPARE_BASE}..HEAD --format='%h|%s')
+
+            echo "---"
+            echo ""
+            echo "## 📥 下载与安装"
+            echo ""
+            echo "### 可用构建"
+            echo ""
+            echo "| 文件 | 平台 | 架构 | 适用设备 |"
+            echo "|------|------|------|----------|"
+            echo "| \`*-windows-amd64.exe\` | Windows | x64 | 大多数 PC、笔记本 |"
+            echo "| \`*-linux-amd64\` | Linux | x64 | 服务器、桌面 Linux |"
+            echo "| \`*-linux-arm64\` | Linux | ARM64 | 树莓派 4/5 (64位系统)、ARM 服务器 |"
+            echo "| \`*-linux-arm\` | Linux | ARM32 | 树莓派 3/Zero、旧 ARM 设备 |"
+            echo "| \`*-darwin-arm64\` | macOS | Apple Silicon | M1/M2/M3/M4 Mac |"
+            echo ""
+            echo "### 快速开始"
+            echo ""
+            echo '```bash'
+            echo "# 1. 下载对应平台的可执行文件"
+            echo "# 2. 放到 DDBOT-WSa 的上级目录"
+            echo ""
+            echo "# Windows"
+            echo "ddbot-wsa-webui-windows-amd64.exe"
+            echo ""
+            echo "# Linux / macOS"
+            echo "chmod +x ddbot-wsa-webui-linux-amd64"
+            echo "./ddbot-wsa-webui-linux-amd64"
+            echo ""
+            echo "# 自定义端口和 Bot 目录"
+            echo "WEBUI_PORT=8080 DDBOT_DIR=/path/to/bot ./ddbot-wsa-webui-linux-amd64"
+            echo '```'
+            echo ""
+            echo "### 运行后目录结构"
+            echo ""
+            echo '```'
+            echo "你的目录/"
+            echo "├── ddbot-wsa-webui(.exe)    ← WebUI"
+            echo "├── config.json              ← 自动生成"
+            echo "├── log/                     ← WebUI 日志"
+            echo "└── data/                    ← Bot 所有文件"
+            echo "    ├── ddbot.exe            ← 放到这里"
+            echo "    ├── application.yaml     ← 自动生成"
+            echo "    ├── .lsp.db"
+            echo "    └── logs/"
+            echo '```'
+            echo ""
+            echo "### 功能概览"
+            echo ""
+            echo "| 功能 | 说明 |"
+            echo "|------|------|"
+            echo "| 🤖 进程管理 | 启动/停止/重启 Bot，支持开机自启 |"
+            echo "| 🔌 适配器 | OneBot v11 / Satori / Telegram 配置与状态 |"
+            echo '| 📺 订阅管理 | 增删改查订阅，对接 Bot Admin API |'
+            echo '| 📋 日志 | 实时流式日志，按级别过滤 |'
+            echo '| ⚙️ 配置 | 分类表单 + 原始 YAML 编辑器 |'
+            echo ""
+            echo "---"
+            echo ""
+            echo "**完整变更**: https://github.com/${{ github.repository }}/compare/${COMPARE_BASE}...${{ steps.version.outputs.tag }}"
+            echo ""
+            echo "> 📌 这是一个 **Pre-Release** 版本，可能存在不稳定因素。"
           } > changelog.md
 
           echo "body<<EOF" >> $GITHUB_OUTPUT
