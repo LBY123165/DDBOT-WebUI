@@ -194,20 +194,37 @@ jobs:
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
             COMMITS=$(git log --oneline --no-decorate -30)
+            COMPARE_BASE=$(git rev-list --max-parents=0 HEAD | head -1)
           else
             COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --no-decorate)
+            COMPARE_BASE="$LAST_TAG"
           fi
+          COMMIT_COUNT=$(echo "$COMMITS" | grep -c '[a-f0-9]' || echo 0)
 
           {
-            echo "## 📦 DDBOT-WSa WebUI ${{ steps.version.outputs.tag }}"
+            echo "<div align=\"center\">"
             echo ""
-            echo "构建时间: ${{ steps.version.outputs.date }}"
+            echo "# 🤖 DDBOT-WSa WebUI"
+            echo ""
+            echo "**${{ steps.version.outputs.tag }}** · ${COMMIT_COUNT} commits since ${COMPARE_BASE:0:7}"
+            echo ""
+            echo "DDBOT-WSa 的 Web 管理面板 · 通过浏览器管理 Bot 进程、订阅、配置、日志"
+            echo ""
+            echo "</div>"
+            echo ""
+            echo "---"
             echo ""
 
+            # Changelog sections
             FEATURES=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ feat" || true)
             FIXES=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ fix" || true)
+            PERF=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ perf" || true)
             DOCS=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ docs" || true)
-            OTHERS=$(echo "$COMMITS" | grep -ivE "^[a-f0-9]+ (feat|fix|docs)" || true)
+            CI=$(echo "$COMMITS" | grep -iE "^[a-f0-9]+ ci" || true)
+            OTHERS=$(echo "$COMMITS" | grep -ivE "^[a-f0-9]+ (feat|fix|perf|docs|ci)" || true)
+
+            echo "## 📋 更新日志"
+            echo ""
 
             if [ -n "$FEATURES" ]; then
               echo "### 🚀 新功能"
@@ -216,40 +233,95 @@ jobs:
             fi
 
             if [ -n "$FIXES" ]; then
-              echo "### 🐛 修复"
+              echo "### 🐛 Bug 修复"
               echo "$FIXES" | sed 's/^[a-f0-9]*/-/'
               echo ""
             fi
 
+            if [ -n "$PERF" ]; then
+              echo "### ⚡ 性能优化"
+              echo "$PERF" | sed 's/^[a-f0-9]*/-/'
+              echo ""
+            fi
+
             if [ -n "$DOCS" ]; then
-              echo "### 📝 文档"
+              echo "### 📝 文档更新"
               echo "$DOCS" | sed 's/^[a-f0-9]*/-/'
               echo ""
             fi
 
+            if [ -n "$CI" ]; then
+              echo "### 🔧 CI/构建"
+              echo "$CI" | sed 's/^[a-f0-9]*/-/'
+              echo ""
+            fi
+
             if [ -n "$OTHERS" ]; then
-              echo "### ⚡ 其他"
+              echo "### 📦 其他变更"
               echo "$OTHERS" | sed 's/^[a-f0-9]*/-/'
               echo ""
             fi
 
             echo "---"
             echo ""
-            echo "### 📥 下载说明"
+            echo "## 📥 下载与安装"
             echo ""
-            echo "| 文件 | 平台 | 架构 |"
-            echo "|------|------|------|"
-            echo "| \`*-windows-amd64.exe\` | Windows | x64 |"
-            echo "| \`*-linux-amd64\` | Linux | x64 |"
-            echo "| \`*-linux-arm64\` | Linux | ARM64 |"
-            echo "| \`*-linux-arm\` | Linux | ARM32 (树莓派等) |"
-            echo "| \`*-darwin-arm64\` | macOS | Apple Silicon |"
+            echo "### 可用构建"
             echo ""
-            echo "下载对应平台的文件，直接运行即可，无需安装 Node.js。"
+            echo "| 文件 | 平台 | 架构 | 适用设备 |"
+            echo "|------|------|------|----------|"
+            echo "| \`*-windows-amd64.exe\` | Windows | x64 | 大多数 PC、笔记本 |"
+            echo "| \`*-linux-amd64\` | Linux | x64 | 服务器、桌面 Linux |"
+            echo "| \`*-linux-arm64\` | Linux | ARM64 | 树莓派 4/5 (64位系统)、ARM 服务器 |"
+            echo "| \`*-linux-arm\` | Linux | ARM32 | 树莓派 3/Zero、旧 ARM 设备 |"
+            echo "| \`*-darwin-arm64\` | macOS | Apple Silicon | M1/M2/M3/M4 Mac |"
+            echo ""
+            echo "### 快速开始"
+            echo ""
+            echo '```bash'
+            echo "# 1. 下载对应平台的可执行文件"
+            echo "# 2. 放到 DDBOT-WSa 的上级目录"
+            echo ""
+            echo "# Windows"
+            echo "ddbot-wsa-webui-windows-amd64.exe"
+            echo ""
+            echo "# Linux / macOS"
+            echo "chmod +x ddbot-wsa-webui-linux-amd64"
+            echo "./ddbot-wsa-webui-linux-amd64"
+            echo ""
+            echo "# 自定义端口和 Bot 目录"
+            echo "WEBUI_PORT=8080 DDBOT_DIR=/path/to/bot ./ddbot-wsa-webui-linux-amd64"
+            echo '```'
+            echo ""
+            echo "### 运行后目录结构"
+            echo ""
+            echo '```'
+            echo "你的目录/"
+            echo "├── ddbot-wsa-webui(.exe)    ← WebUI"
+            echo "├── config.json              ← 自动生成"
+            echo "├── log/                     ← WebUI 日志"
+            echo "└── data/                    ← Bot 所有文件"
+            echo "    ├── ddbot.exe            ← 放到这里"
+            echo "    ├── application.yaml     ← 自动生成"
+            echo "    ├── .lsp.db"
+            echo "    └── logs/"
+            echo '```'
+            echo ""
+            echo "### 功能概览"
+            echo ""
+            echo "| 功能 | 说明 |"
+            echo "|------|------|"
+            echo "| 🤖 进程管理 | 启动/停止/重启 Bot，支持开机自启 |"
+            echo "| 🔌 适配器 | OneBot v11 / Satori / Telegram 配置与状态 |"
+            echo "| 📺 订阅管理 | 增删改查订阅，对接 Bot Admin API |"
+            echo "| 📋 日志 | 实时流式日志，按级别过滤 |"
+            echo "| ⚙️ 配置 | 分类表单 + 原始 YAML 编辑器 |"
             echo ""
             echo "---"
             echo ""
-            echo "**完整变更**: https://github.com/${{ github.repository }}/compare/${LAST_TAG:-$(git rev-list --max-parents=0 HEAD | head -1)}...${{ steps.version.outputs.tag }}"
+            echo "**完整变更**: https://github.com/${{ github.repository }}/compare/${COMPARE_BASE}...${{ steps.version.outputs.tag }}"
+            echo ""
+            echo "> 📌 这是一个 **Pre-Release** 版本，可能存在不稳定因素。"
           } > changelog.md
 
           echo "body<<EOF" >> $GITHUB_OUTPUT
