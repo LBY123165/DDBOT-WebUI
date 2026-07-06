@@ -328,10 +328,20 @@ app.post('/api/config', (req, res) => {
     if (!content) return res.status(400).json({ success: false, message: '内容不能为空' });
     // Validate YAML
     yaml.load(content);
-    // Backup
+    // Backup (keep latest 3)
     if (fs.existsSync(getConfigPath())) {
+      const configDir = path.dirname(getConfigPath());
+      const configBase = path.basename(getConfigPath());
       const backup = getConfigPath() + '.bak.' + Date.now();
       fs.copyFileSync(getConfigPath(), backup);
+      // Clean old backups
+      const backups = fs.readdirSync(configDir)
+        .filter(f => f.startsWith(configBase + '.bak.'))
+        .sort()
+        .reverse();
+      for (const old of backups.slice(3)) {
+        try { fs.unlinkSync(path.join(configDir, old)); } catch {}
+      }
     }
     fs.writeFileSync(getConfigPath(), content, 'utf-8');
     res.json({ success: true, message: '配置已保存' });
