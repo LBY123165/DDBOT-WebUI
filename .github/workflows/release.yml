@@ -34,13 +34,7 @@ jobs:
             arch: arm64
             ext: ""
 
-          # macOS Intel
-          - os: macos-13
-            platform: darwin
-            arch: amd64
-            ext: ""
-
-          # macOS Apple Silicon
+          # macOS Apple Silicon (Intel Mac 已淘汰)
           - os: macos-latest
             platform: darwin
             arch: arm64
@@ -163,6 +157,7 @@ jobs:
 
       - name: Rename artifact
         run: |
+          sudo chown -R $(id -u):$(id -g) dist/
           cd dist
           mv ddbot-wsa-webui ddbot-wsa-webui-linux-arm
           echo "asset=ddbot-wsa-webui-linux-arm" >> $GITHUB_ENV
@@ -248,7 +243,6 @@ jobs:
             echo "| \`*-linux-amd64\` | Linux | x64 |"
             echo "| \`*-linux-arm64\` | Linux | ARM64 |"
             echo "| \`*-linux-arm\` | Linux | ARM32 (树莓派等) |"
-            echo "| \`*-darwin-amd64\` | macOS | Intel |"
             echo "| \`*-darwin-arm64\` | macOS | Apple Silicon |"
             echo ""
             echo "下载对应平台的文件，直接运行即可，无需安装 Node.js。"
