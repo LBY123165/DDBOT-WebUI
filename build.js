@@ -52,28 +52,27 @@ execSync('npm install --omit=dev --ignore-scripts', {
   stdio: 'pipe'
 });
 
-// Remove unnecessary files from node_modules
+// Remove unnecessary files from node_modules (safe patterns only)
 const cleanDir = (dir) => {
   if (!fs.existsSync(dir)) return;
-  const patterns = [
-    /\.md$/i, /README/i, /LICENSE/i, /CHANGELOG/i,
-    /test/i, /tests/i, /__tests__/i, /spec/i,
-    /\.map$/, /\.d\.ts$/, /tsconfig/,
-    /\.github/, /\.travis/, /\.circleci/,
-    /example/i, /doc/i, /docs/i,
-  ];
   const walk = (d) => {
     for (const f of fs.readdirSync(d)) {
       const fp = path.join(d, f);
       const stat = fs.statSync(fp);
       if (stat.isDirectory()) {
-        if (/^(test|tests|__tests__|spec|example|examples|doc|docs|\.github)$/i.test(f)) {
+        // Only remove clearly unnecessary directories
+        if (/^(test|tests|__tests__|\.github|example|examples|\.nyc_output|coverage)$/.test(f)) {
           fs.rmSync(fp, { recursive: true, force: true });
           continue;
         }
         walk(fp);
-      } else if (patterns.some(p => p.test(f))) {
-        fs.unlinkSync(fp);
+      } else {
+        // Only remove clearly unnecessary files
+        if (/^(README|LICENSE|CHANGELOG|HISTORY|SECURITY)/i.test(f) && /\.(md|txt|rst)$/i.test(f)) {
+          fs.unlinkSync(fp);
+        } else if (/\.map$/.test(f)) {
+          fs.unlinkSync(fp);
+        }
       }
     }
   };
