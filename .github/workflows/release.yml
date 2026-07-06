@@ -16,73 +16,35 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Windows
+          # Windows x64
           - os: windows-latest
             platform: windows
             arch: amd64
             ext: .exe
-            artifact_ext: .exe
 
-          - os: windows-latest
-            platform: windows
-            arch: 386
-            ext: .exe
-            artifact_ext: .exe
-            node_arch: x86
-
-          - os: windows-latest
-            platform: windows
-            arch: arm64
-            ext: .exe
-            artifact_ext: .exe
-            node_arch: arm64
-
-          - os: windows-latest
-            platform: windows
-            arch: arm
-            ext: .exe
-            artifact_ext: .exe
-            node_arch: arm
-
-          # Linux
+          # Linux x64
           - os: ubuntu-latest
             platform: linux
             arch: amd64
             ext: ""
-            artifact_ext: ""
 
-          - os: ubuntu-latest
-            platform: linux
-            arch: 386
-            ext: ""
-            artifact_ext: ""
-            node_arch: x86
-
+          # Linux ARM64 (native ARM runner)
           - os: ubuntu-24.04-arm
             platform: linux
             arch: arm64
             ext: ""
-            artifact_ext: ""
 
-          - os: ubuntu-latest
-            platform: linux
-            arch: arm
-            ext: ""
-            artifact_ext: ""
-            node_arch: arm
-
-          # macOS
+          # macOS Intel
           - os: macos-13
             platform: darwin
             arch: amd64
             ext: ""
-            artifact_ext: ""
 
+          # macOS Apple Silicon
           - os: macos-latest
             platform: darwin
             arch: arm64
             ext: ""
-            artifact_ext: ""
 
     runs-on: ${{ matrix.os }}
     name: Build (${{ matrix.platform }}-${{ matrix.arch }})
@@ -94,8 +56,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          architecture: ${{ matrix.node_arch || 'x64' }}
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -104,14 +65,41 @@ jobs:
       - name: Install caxa
         run: npm install caxa --save-dev
 
+      - name: Prepare build directory
+        shell: bash
+        run: |
+          mkdir -p .build
+
+          cp server.js .build/
+          cp package.json .build/
+          cp -r lib .build/
+          cp -r public .build/
+
+          cd .build
+          npm install --omit=dev --ignore-scripts
+
+          # Clean unnecessary files from node_modules
+          find node_modules -name "*.md" -not -path "*/node_modules/.package-lock.json" -delete 2>/dev/null || true
+          find node_modules -name "README*" -delete 2>/dev/null || true
+          find node_modules -name "LICENSE*" -delete 2>/dev/null || true
+          find node_modules -name "CHANGELOG*" -delete 2>/dev/null || true
+          find node_modules -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "__tests__" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "doc" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "docs" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name "example" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -type d -name ".github" -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "*.map" -delete 2>/dev/null || true
+          find node_modules -name "*.d.ts" -delete 2>/dev/null || true
+
       - name: Build executable
         shell: bash
         run: |
           mkdir -p dist
           OUTPUT="dist/ddbot-wsa-webui${{ matrix.ext }}"
 
-          npx caxa --input . --output "$OUTPUT" \
-            --exclude 'dist/**' '.git/**' 'node_modules/.cache/**' '.github/**' \
+          npx caxa --input .build --output "$OUTPUT" \
             --no-dedupe \
             -- "{{caxa}}/node_modules/.bin/node" "{{caxa}}/server.js"
 
@@ -138,8 +126,55 @@ jobs:
           name: ${{ env.asset }}
           path: dist/${{ env.asset }}
 
+  # Linux ARM32 via QEMU (armv7/armhf)
+  build-arm:
+    runs-on: ubuntu-latest
+    name: Build (linux-arm)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm/v7
+
+      - name: Build in ARM32 container
+        run: |
+          docker run --rm --platform linux/arm/v7 \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            node:20-bookworm-slim \
+            bash -c '
+              mkdir -p .build
+              cp server.js .build/
+              cp package.json .build/
+              cp -r lib .build/
+              cp -r public .build/
+              cd .build
+              npm install --omit=dev --ignore-scripts
+              npm install caxa --save-dev
+              npx caxa --input . --output /workspace/dist/ddbot-wsa-webui \
+                --no-dedupe \
+                -- "{{caxa}}/node_modules/.bin/node" "{{caxa}}/server.js"
+              chmod +x /workspace/dist/ddbot-wsa-webui
+            '
+
+      - name: Rename artifact
+        run: |
+          cd dist
+          mv ddbot-wsa-webui ddbot-wsa-webui-linux-arm
+          echo "asset=ddbot-wsa-webui-linux-arm" >> $GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.asset }}
+          path: dist/${{ env.asset }}
+
   release:
-    needs: build
+    needs: [build, build-arm]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
@@ -209,9 +244,12 @@ jobs:
             echo ""
             echo "| 文件 | 平台 | 架构 |"
             echo "|------|------|------|"
-            echo "| \`*-windows-*.exe\` | Windows | x64 / x86 / ARM / ARM64 |"
-            echo "| \`*-linux-*\` | Linux | x64 / x86 / ARM / ARM64 |"
-            echo "| \`*-darwin-*\` | macOS | x64 (Intel) / ARM64 (Apple Silicon) |"
+            echo "| \`*-windows-amd64.exe\` | Windows | x64 |"
+            echo "| \`*-linux-amd64\` | Linux | x64 |"
+            echo "| \`*-linux-arm64\` | Linux | ARM64 |"
+            echo "| \`*-linux-arm\` | Linux | ARM32 (树莓派等) |"
+            echo "| \`*-darwin-amd64\` | macOS | Intel |"
+            echo "| \`*-darwin-arm64\` | macOS | Apple Silicon |"
             echo ""
             echo "下载对应平台的文件，直接运行即可，无需安装 Node.js。"
             echo ""
